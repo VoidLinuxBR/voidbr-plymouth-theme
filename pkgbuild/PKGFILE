@@ -32,34 +32,67 @@ package() {
 }
 
 post_install() {
-	defaultPlymouthTheme='voidlinuxbr'
+	defaultPlymouthTheme="voidbr"
+	grub_changed=0
+	dracut_changed=0
+	plymouth_changed=0
+	dracut_conf="/etc/dracut.conf.d/10-plymouth.conf"
 
-	echo "[*] $PKGNAME - Checando por /etc/dracut.conf.d/10-plymouth.conf"
-	if [ ! -f /etc/dracut.conf.d/10-plymouth.conf ]; then
-		cat >/etc/dracut.conf.d/10-plymouth.conf <<'EOF'
+	echo "[*] $PKGNAME - Checando dracut (plymouth)"
+	if [ ! -f "$dracut_conf" ]; then
+		cat >"$dracut_conf" <<'EOF'
 # Enable Plymouth in initramfs
 add_dracutmodules+=" plymouth "
 EOF
+		dracut_changed=1
+	elif ! grep -q '\<plymouth\>' "$dracut_conf"; then
+		echo 'add_dracutmodules+=" plymouth "' >>"$dracut_conf"
+		dracut_changed=1
 	fi
 
-	echo "[*] $PKGNAME - Garante que quiet e splash estejam presentes no /etc/defaulg/grub"
-	if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
-		grep -q 'quiet' /etc/default/grub ||
-			sed -i 's/^\(GRUB_CMDLINE_LINUX_DEFAULT=".*\)"/\1 quiet"/' /etc/default/grub
+	echo "[*] $PKGNAME - Garantindo quiet e splash no GRUB"
+	if [ -f /etc/default/grub ]; then
+		if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
+			if ! grep -q '\<quiet\>' /etc/default/grub ||
+				! grep -q '\<splash\>' /etc/default/grub; then
 
-		grep -q 'splash' /etc/default/grub ||
-			sed -i 's/^\(GRUB_CMDLINE_LINUX_DEFAULT=".*\)"/\1 splash"/' /etc/default/grub
+				sed -i \
+					-e 's/\<quiet\>//g' \
+					-e 's/\<splash\>//g' \
+					-e 's/^\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 quiet splash"/' \
+					/etc/default/grub
+
+				grub_changed=1
+			fi
+		else
+			echo 'GRUB_CMDLINE_LINUX_DEFAULT="loglevel=4 quiet splash"' >>/etc/default/grub
+			grub_changed=1
+		fi
+	fi
+
+	if [ "$grub_changed" -eq 1 ]; then
+		echo "[*] $PKGNAME - GRUB alterado, regenerando grub.cfg"
+		grub-mkconfig -o /boot/grub/grub.cfg
 	else
-		echo 'GRUB_CMDLINE_LINUX_DEFAULT="loglevel=4 quiet splash"' >>/etc/default/grub
+		echo "[*] $PKGNAME - GRUB inalterado, pulando grub-mkconfig"
 	fi
-	grub-mkconfig -o /boot/grub/grub.cfg
 
-	echo "[*] $pkgname - Configurando $defaultPlymouthTheme no Plymouth"
-	if ! plymouth-set-default-theme "$defaultPlymouthTheme"; then
+	echo "[*] $PKGNAME - Configurando tema Plymouth: $defaultPlymouthTheme"
+	if plymouth-set-default-theme "$defaultPlymouthTheme"; then
+		plymouth_changed=1
+	else
+		echo "[!] Falha ao configurar o Plymouth"
 		exit 1
-	else
-		echo "[*] $PKGNAME - Criando initramfs"
-		dracut -f
 	fi
 
+	if command -v dracut >/dev/null 2>&1; then
+		if [ "$dracut_changed" -eq 1 ] || [ "$plymouth_changed" -eq 1 ]; then
+			echo "[*] $PKGNAME - Recriando initramfs (mudanças detectadas)"
+			dracut -f
+		else
+			echo "[*] $PKGNAME - Initramfs inalterado, pulando dracut"
+		fi
+	else
+		echo "[!] dracut não encontrado, pulando initramfs"
+	fi
 }
