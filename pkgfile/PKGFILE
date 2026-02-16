@@ -31,7 +31,7 @@ package() {
 	done
 }
 
-post_install() {
+post_install_DESATIVADO() {
 	defaultPlymouthTheme="voidbr"
 	grub_changed=0
 	dracut_changed=0
