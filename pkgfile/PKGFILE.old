@@ -31,7 +31,7 @@ package() {
 	done
 }
 
-post_install() {
+post_install_DESATIVADO() {
 	defaultPlymouthTheme="voidbr"
 	grub_changed=0
 	dracut_changed=0
@@ -112,16 +112,15 @@ EOF
 		exit 1
 	fi
 
-#	if command -v dracut >/dev/null 2>&1; then
-#		if [ "$dracut_changed" -eq 1 ] || [ "$plymouth_changed" -eq 1 ]; then
-#			echo "${CYAN}[*]${RESET} Recriando initramfs (mudanças detectadas)"
-#			dracut -f
-#			echo "${GREEN}[+]${RESET} initramfs atualizado"
-#		else
-#			echo "${YELLOW}[-]${RESET} initramfs inalterado"
-#		fi
-#	else
-#		echo "${YELLOW}[!]${RESET} dracut não encontrado, pulando initramfs"
-#	fi
-
+	if command -v dracut >/dev/null 2>&1; then
+		if [ "$dracut_changed" -eq 1 ] || [ "$plymouth_changed" -eq 1 ]; then
+			echo "${CYAN}[*]${RESET} Recriando initramfs (mudanças detectadas)"
+			dracut -f
+			echo "${GREEN}[+]${RESET} initramfs atualizado"
+		else
+			echo "${YELLOW}[-]${RESET} initramfs inalterado"
+		fi
+	else
+		echo "${YELLOW}[!]${RESET} dracut não encontrado, pulando initramfs"
+	fi
 }
