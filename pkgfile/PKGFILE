@@ -11,13 +11,6 @@ source=("git+${url}.git")
 md5sums=('SKIP')
 depends=(plymouth)
 
-# Automatically detect and use the correct install file
-if [ -e "${pkgname}.install" ]; then
-	install=${pkgname}.install
-elif [ -e "pkgbuild.install" ]; then
-	install=pkgbuild.install
-fi
-
 package() {
 	local dirs=("usr" "etc" "opt")
 	#   echo "DESTDIR=$DESTDIR"
@@ -123,5 +116,18 @@ EOF
 #	else
 #		echo "${YELLOW}[!]${RESET} dracut não encontrado, pulando initramfs"
 #	fi
-
 }
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  post_install
+}
+
+
