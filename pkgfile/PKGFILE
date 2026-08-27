@@ -108,7 +108,7 @@ EOF
 	if command -v dracut >/dev/null 2>&1; then
 		if [ "$dracut_changed" -eq 1 ] || [ "$plymouth_changed" -eq 1 ]; then
 			echo "${CYAN}[*]${RESET} Recriando initramfs (mudanças detectadas)"
-			dracut -f
+			dracut -f -H
 			echo "${GREEN}[+]${RESET} initramfs atualizado"
 		else
 			echo "${YELLOW}[-]${RESET} initramfs inalterado"
