@@ -106,31 +106,8 @@ EOF
 	fi
 
 	if command -v dracut >/dev/null 2>&1; then
-		initramfs_changed=0
-
-		# Se o módulo acabou de ser configurado, o initramfs
-		# obrigatoriamente precisa ser recriado.
-		if [ "$dracut_changed" -eq 0 ]; then
-			for initramfs in /boot/initramfs-*.img; do
-				[ -f "$initramfs" ] || continue
-
-				initramfs_content="$(lsinitrd "$initramfs" 2>/dev/null)"
-
-				if ! printf '%s\n' "$initramfs_content" |
-					grep -q '/usr/lib/dracut/modules.d/.*plymouth' ||
-					! printf '%s\n' "$initramfs_content" |
-					grep -q "/usr/share/plymouth/themes/$defaultPlymouthTheme/"; then
-
-					initramfs_changed=1
-					echo "${CYAN}[*]${RESET} $initramfs sem Plymouth ou tema $defaultPlymouthTheme"
-				else
-					echo "${YELLOW}[-]${RESET} $initramfs já contém Plymouth e tema $defaultPlymouthTheme"
-				fi
-			done
-		fi
-
-		if [ "$dracut_changed" -eq 1 ] || [ "$initramfs_changed" -eq 1 ]; then
-			echo "${CYAN}[*]${RESET} Recriando initramfs"
+		if [ "$dracut_changed" -eq 1 ] || [ "$plymouth_changed" -eq 1 ]; then
+			echo "${CYAN}[*]${RESET} Recriando initramfs (mudanças detectadas)"
 			dracut -f -H
 			echo "${GREEN}[+]${RESET} initramfs atualizado"
 		else
