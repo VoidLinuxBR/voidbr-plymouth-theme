@@ -112,16 +112,12 @@ EOF
 			for initramfs in /boot/initramfs-*.img; do
 				[ -f "$initramfs" ] || continue
 
-				if ! lsinitrd -m "$initramfs" 2>/dev/null |
-					grep -q '^plymouth$'; then
-					initramfs_changed=1
-					echo "${CYAN}[*]${RESET} $initramfs sem módulo Plymouth"
-				elif ! lsinitrd "$initramfs" 2>/dev/null |
-					grep -q "/usr/share/plymouth/themes/$defaultPlymouthTheme/"; then
+				if ! lsinitrd "$initramfs" 2>/dev/null |
+					grep -q "usr/share/plymouth/themes/$defaultPlymouthTheme/"; then
 					initramfs_changed=1
 					echo "${CYAN}[*]${RESET} $initramfs sem tema $defaultPlymouthTheme"
 				else
-					echo "${YELLOW}[-]${RESET} $initramfs já contém Plymouth e tema $defaultPlymouthTheme"
+					echo "${YELLOW}[-]${RESET} $initramfs já contém tema $defaultPlymouthTheme"
 				fi
 			done
 		fi
@@ -129,6 +125,8 @@ EOF
 		if [ "$dracut_changed" -eq 1 ] || [ "$initramfs_changed" -eq 1 ]; then
 			echo "${CYAN}[*]${RESET} Recriando initramfs"
 			dracut -f -H
+      update-grub
+      update-limine
 			echo "${GREEN}[+]${RESET} initramfs atualizado"
 		else
 			echo "${YELLOW}[-]${RESET} initramfs inalterado"
@@ -147,7 +145,5 @@ pre_upgrade() {
 }
 
 post_upgrade() {
-  post_install
+	post_install
 }
-
-
