@@ -122,6 +122,11 @@ EOF
 			done
 		fi
 
+    if [ -n "$MKISO_BUILD" ]; then
+      echo "${YELLOW}[!]${RESET} Build de ISO detectado — pulando ajuste de bootloader/initramfs (o mkiso já cuida disso)."
+      return 0
+    fi
+
 		if [ "$dracut_changed" -eq 1 ] || [ "$initramfs_changed" -eq 1 ]; then
 			echo "${CYAN}[*]${RESET} Recriando initramfs"
 			dracut -f -H
