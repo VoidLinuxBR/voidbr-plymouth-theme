@@ -105,7 +105,9 @@ EOF
 		exit 1
 	fi
 
-	if command -v dracut >/dev/null 2>&1; then
+	if [ -n "$MKISO_BUILD" ]; then
+		echo "${YELLOW}[-]${RESET} Build de ISO detectado (MKISO_BUILD) — pulando regeneração de initramfs aqui; o mkiso já gera o dele na etapa própria."
+	elif command -v dracut >/dev/null 2>&1; then
 		initramfs_changed=0
 
 		if [ "$dracut_changed" -eq 0 ]; then
@@ -121,11 +123,6 @@ EOF
 				fi
 			done
 		fi
-
-    if [ -n "$MKISO_BUILD" ]; then
-      echo "${YELLOW}[!]${RESET} Build de ISO detectado — pulando ajuste de bootloader/initramfs (o mkiso já cuida disso)."
-      return 0
-    fi
 
 		if [ "$dracut_changed" -eq 1 ] || [ "$initramfs_changed" -eq 1 ]; then
 			echo "${CYAN}[*]${RESET} Recriando initramfs"
@@ -152,3 +149,4 @@ pre_upgrade() {
 post_upgrade() {
 	post_install
 }
+
