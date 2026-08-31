@@ -27,6 +27,7 @@ package() {
 post_install() {
 	defaultPlymouthTheme="voidbr"
 	grub_changed=0
+	limine_changed=0
 	dracut_changed=0
 	plymouth_changed=0
 	dracut_conf="/etc/dracut.conf.d/10-plymouth.conf"
@@ -63,40 +64,62 @@ EOF
 		echo "${YELLOW}[-]${RESET} dracut já configurado"
 	fi
 
-	echo "${CYAN}[*]${RESET} $PKGNAME - Garantindo quiet e splash no GRUB"
-	if [ -f /etc/default/grub ]; then
-		if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
-			if ! grep -q '\<quiet\>' /etc/default/grub ||
-				! grep -q '\<splash\>' /etc/default/grub; then
+	# ======================================================
+	# GRUB
+	# ======================================================
 
-				sed -i \
-					-e 's/\<quiet\>//g' \
-					-e 's/\<splash\>//g' \
-					-e 's/^\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 quiet splash"/' \
-					/etc/default/grub
+	if command -v grub-mkconfig >/dev/null 2>&1; then
+		echo "${CYAN}[*]${RESET} $PKGNAME - GRUB detectado"
 
-				grub_changed=1
-				echo "${GREEN}[+]${RESET} GRUB atualizado"
+		echo "${CYAN}[*]${RESET} $PKGNAME - Garantindo quiet e splash no GRUB"
+
+		if [ -f /etc/default/grub ]; then
+			if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
+				if ! grep -q '\<quiet\>' /etc/default/grub ||
+					! grep -q '\<splash\>' /etc/default/grub; then
+
+					sed -i \
+						-e 's/\<quiet\>//g' \
+						-e 's/\<splash\>//g' \
+						-e 's/^\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 quiet splash"/' \
+						/etc/default/grub
+
+					grub_changed=1
+					echo "${GREEN}[+]${RESET} GRUB atualizado"
+				else
+					echo "${YELLOW}[-]${RESET} GRUB já contém quiet e splash"
+				fi
 			else
-				echo "${YELLOW}[-]${RESET} GRUB já contém quiet e splash"
+				echo 'GRUB_CMDLINE_LINUX_DEFAULT="loglevel=4 quiet splash"' >>/etc/default/grub
+				grub_changed=1
+				echo "${GREEN}[+]${RESET} GRUB_CMDLINE_LINUX_DEFAULT criado"
 			fi
 		else
-			echo 'GRUB_CMDLINE_LINUX_DEFAULT="loglevel=4 quiet splash"' >>/etc/default/grub
-			grub_changed=1
-			echo "${GREEN}[+]${RESET} GRUB_CMDLINE_LINUX_DEFAULT criado"
+			echo "${YELLOW}[!]${RESET} /etc/default/grub não encontrado"
 		fi
-	else
-		echo "${YELLOW}[!]${RESET} /etc/default/grub não encontrado"
+
+		if [ "$grub_changed" -eq 1 ]; then
+			echo "${CYAN}[*]${RESET} Regenerando grub.cfg"
+			grub-mkconfig -o /boot/grub/grub.cfg
+		else
+			echo "${YELLOW}[-]${RESET} grub.cfg inalterado"
+		fi
 	fi
 
-	if [ "$grub_changed" -eq 1 ]; then
-		echo "${CYAN}[*]${RESET} Regenerando grub.cfg"
-		grub-mkconfig -o /boot/grub/grub.cfg
-	else
-		echo "${YELLOW}[-]${RESET} grub.cfg inalterado"
+	# ======================================================
+	# LIMINE
+	# ======================================================
+
+	if command -v limine >/dev/null 2>&1; then
+		echo "${CYAN}[*]${RESET} $PKGNAME - Limine detectado"
 	fi
+
+	# ======================================================
+	# PLYMOUTH
+	# ======================================================
 
 	echo "${CYAN}[*]${RESET} $PKGNAME - Configurando tema Plymouth: ${GREEN}$defaultPlymouthTheme${RESET}"
+
 	if plymouth-set-default-theme "$defaultPlymouthTheme"; then
 		plymouth_changed=1
 		echo "${GREEN}[+]${RESET} Tema Plymouth configurado"
@@ -105,8 +128,13 @@ EOF
 		exit 1
 	fi
 
-	if [ -n "$MKISO_BUILD" ]; then
+	# ======================================================
+	# INITRAMFS
+	# ======================================================
+
+	if [ -n "${MKISO_BUILD:-}" ]; then
 		echo "${YELLOW}[-]${RESET} Build de ISO detectado (MKISO_BUILD) — pulando regeneração de initramfs aqui; o mkiso já gera o dele na etapa própria."
+
 	elif command -v dracut >/dev/null 2>&1; then
 		initramfs_changed=0
 
@@ -116,6 +144,7 @@ EOF
 
 				if ! lsinitrd "$initramfs" 2>/dev/null |
 					grep -q "usr/share/plymouth/themes/$defaultPlymouthTheme/"; then
+
 					initramfs_changed=1
 					echo "${CYAN}[*]${RESET} $initramfs sem tema $defaultPlymouthTheme"
 				else
@@ -127,8 +156,17 @@ EOF
 		if [ "$dracut_changed" -eq 1 ] || [ "$initramfs_changed" -eq 1 ]; then
 			echo "${CYAN}[*]${RESET} Recriando initramfs"
 			dracut -f -H
-      update-grub
-      update-limine
+
+			if command -v grub-mkconfig >/dev/null 2>&1; then
+				echo "${CYAN}[*]${RESET} Atualizando GRUB"
+				update-grub
+			fi
+
+			if command -v limine >/dev/null 2>&1; then
+				echo "${CYAN}[*]${RESET} Atualizando Limine"
+				update-limine
+			fi
+
 			echo "${GREEN}[+]${RESET} initramfs atualizado"
 		else
 			echo "${YELLOW}[-]${RESET} initramfs inalterado"
@@ -149,4 +187,3 @@ pre_upgrade() {
 post_upgrade() {
 	post_install
 }
-
