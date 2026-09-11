@@ -164,7 +164,7 @@ EOF
 
 			if command -v limine >/dev/null 2>&1; then
 				echo "${CYAN}[*]${RESET} Atualizando Limine"
-				update-limine
+				/usr/local/bin/update-limine || true
 			fi
 
 			echo "${GREEN}[+]${RESET} initramfs atualizado"
