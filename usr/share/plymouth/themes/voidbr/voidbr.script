@@ -1,10 +1,180 @@
-logo = Image("void-show-252x252.png");
+# VoidBR Plymouth theme
+# Logo central + barra de progresso + linha de status logo abaixo.
 
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+screen_x = Window.GetX();
+screen_y = Window.GetY();
 screen_width = Window.GetWidth();
 screen_height = Window.GetHeight();
+mode = Plymouth.GetMode();
 
-logo_x = (screen_width - logo.GetWidth()) / 2;
-logo_y = (screen_height - logo.GetHeight()) / 2;
+#------------------------------- Logo -------------------------------
 
-sprite = Sprite(logo);
-sprite.SetPosition(logo_x, logo_y, 0);
+logo.image = Image("void-show-252x252.png");
+logo.sprite = Sprite(logo.image);
+logo.x = screen_x + (screen_width - logo.image.GetWidth()) / 2;
+logo.y = screen_y + (screen_height - logo.image.GetHeight()) / 2;
+logo.sprite.SetPosition(logo.x, logo.y, 0);
+
+#------------------------- Barra de progresso -------------------------
+
+progress_box.image = Image("progress_box.png");
+progress_box.sprite = Sprite(progress_box.image);
+progress_box.x = screen_x + (screen_width - progress_box.image.GetWidth()) / 2;
+progress_box.y = logo.y + logo.image.GetHeight() + 30;
+progress_box.sprite.SetPosition(progress_box.x, progress_box.y, 1);
+
+progress_bar.original_image = Image("progress_bar.png");
+progress_bar.sprite = Sprite();
+progress_bar.x = progress_box.x + 2;
+progress_bar.y = progress_box.y + 2;
+progress_bar.sprite.SetPosition(progress_bar.x, progress_bar.y, 2);
+progress_bar.width = 0;
+
+fun set_progress(progress)
+{
+  if (progress < 0) progress = 0;
+  if (progress > 1) progress = 1;
+  new_width = Math.Int(progress_bar.original_image.GetWidth() * progress);
+  if (new_width < 1) new_width = 1;
+  if (new_width != progress_bar.width)
+  {
+    progress_bar.width = new_width;
+    progress_bar.image = progress_bar.original_image.Crop(0, 0, new_width, progress_bar.original_image.GetHeight());
+    progress_bar.sprite.SetImage(progress_bar.image);
+  }
+}
+
+fun progress_callback(duration, progress)
+{
+  set_progress(progress);
+}
+
+Plymouth.SetBootProgressFunction(progress_callback);
+
+# No desligamento/reboot não há progresso: some com a barra
+if (mode == "shutdown" || mode == "reboot")
+{
+  progress_box.sprite.SetOpacity(0);
+  progress_bar.sprite.SetOpacity(0);
+}
+
+#------------------------- Linha de status -------------------------
+# Recebe tanto 'plymouth message --text=...' quanto 'plymouth update --status=...'
+
+status_line.sprite = Sprite();
+status_line.y = progress_box.y + progress_box.image.GetHeight() + 14;
+
+fun show_status(text)
+{
+  if (text == "")
+  {
+    status_line.sprite.SetOpacity(0);
+    return;
+  }
+  status_line.image = Image.Text(text, 0.72, 0.72, 0.75);
+  status_line.sprite.SetImage(status_line.image);
+  status_line.sprite.SetPosition(screen_x + (screen_width - status_line.image.GetWidth()) / 2, status_line.y, 3);
+  status_line.sprite.SetOpacity(1);
+}
+
+fun message_callback(text)
+{
+  show_status(text);
+}
+
+fun hide_message_callback(text)
+{
+  show_status("");
+}
+
+fun update_status_callback(status)
+{
+  show_status(status);
+}
+
+Plymouth.SetDisplayMessageFunction(message_callback);
+Plymouth.SetHideMessageFunction(hide_message_callback);
+Plymouth.SetUpdateStatusFunction(update_status_callback);
+
+if (mode == "shutdown") show_status("Desligando...");
+if (mode == "reboot") show_status("Reiniciando...");
+
+#------------------------- Senha (LUKS) -------------------------
+
+dialog.visible = 0;
+
+fun dialog_setup()
+{
+  dialog.box.image = Image("box.png");
+  dialog.box.sprite = Sprite(dialog.box.image);
+  dialog.box.x = screen_x + (screen_width - dialog.box.image.GetWidth()) / 2;
+  dialog.box.y = progress_box.y - 10;
+  dialog.box.sprite.SetPosition(dialog.box.x, dialog.box.y, 10);
+
+  dialog.entry.image = Image("entry.png");
+  dialog.entry.sprite = Sprite(dialog.entry.image);
+  dialog.entry.x = screen_x + (screen_width - dialog.entry.image.GetWidth()) / 2;
+  dialog.entry.y = dialog.box.y + dialog.box.image.GetHeight() - dialog.entry.image.GetHeight() - 10;
+  dialog.entry.sprite.SetPosition(dialog.entry.x, dialog.entry.y, 11);
+
+  dialog.prompt.sprite = Sprite();
+  dialog.bullets.sprite = Sprite();
+  dialog.visible = 1;
+}
+
+fun dialog_opacity(opacity)
+{
+  dialog.box.sprite.SetOpacity(opacity);
+  dialog.entry.sprite.SetOpacity(opacity);
+  dialog.prompt.sprite.SetOpacity(opacity);
+  dialog.bullets.sprite.SetOpacity(opacity);
+}
+
+fun display_password_callback(prompt, bullets)
+{
+  if (!dialog.visible) dialog_setup();
+  else dialog_opacity(1);
+
+  # esconde barra e status enquanto pede a senha
+  progress_box.sprite.SetOpacity(0);
+  progress_bar.sprite.SetOpacity(0);
+  status_line.sprite.SetOpacity(0);
+
+  if (prompt == "") prompt = "Senha:";
+  dialog.prompt.image = Image.Text(prompt, 1, 1, 1);
+  dialog.prompt.sprite.SetImage(dialog.prompt.image);
+  dialog.prompt.sprite.SetPosition(screen_x + (screen_width - dialog.prompt.image.GetWidth()) / 2, dialog.box.y + 8, 11);
+
+  stars = "";
+  for (i = 0; i < bullets && i < 30; i++) stars += "*";
+  if (stars == "") stars = " ";
+  dialog.bullets.image = Image.Text(stars, 0, 0, 0);
+  dialog.bullets.sprite.SetImage(dialog.bullets.image);
+  dialog.bullets.sprite.SetPosition(dialog.entry.x + 8, dialog.entry.y + (dialog.entry.image.GetHeight() - dialog.bullets.image.GetHeight()) / 2, 12);
+}
+
+fun display_normal_callback()
+{
+  if (dialog.visible) dialog_opacity(0);
+  if (mode == "boot" || mode == "resume")
+  {
+    progress_box.sprite.SetOpacity(1);
+    progress_bar.sprite.SetOpacity(1);
+  }
+}
+
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+Plymouth.SetDisplayNormalFunction(display_normal_callback);
+
+#------------------------------- Quit -------------------------------
+# Com 'quit --retain-splash' este é o último quadro que fica na tela até o DM.
+
+fun quit_callback()
+{
+  if (mode == "boot") set_progress(1);
+}
+
+Plymouth.SetQuitFunction(quit_callback);
