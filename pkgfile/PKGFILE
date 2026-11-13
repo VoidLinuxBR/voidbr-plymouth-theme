@@ -100,8 +100,12 @@ EOF
 		fi
 
 		if [ "$grub_changed" -eq 1 ]; then
-			echo "${CYAN}[*]${RESET} Regenerando grub.cfg"
-			grub-mkconfig -o /boot/grub/grub.cfg
+			if [ -n "${MKISO_BUILD:-}" ]; then
+				echo "${YELLOW}[-]${RESET} Build de ISO detectado (MKISO_BUILD) — pulando grub-mkconfig."
+			else
+				echo "${CYAN}[*]${RESET} Regenerando grub.cfg"
+				grub-mkconfig -o /boot/grub/grub.cfg
+			fi
 		else
 			echo "${YELLOW}[-]${RESET} grub.cfg inalterado"
 		fi
