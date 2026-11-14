@@ -67,6 +67,7 @@ post_install() {
 	fi
 
 	defaultPlymouthTheme="voidbr"
+	themeDir="/usr/share/plymouth/themes/$defaultPlymouthTheme"
 
 	# ======================================================
 	# TEMA
@@ -94,8 +95,9 @@ post_install() {
 	# ======================================================
 	# O tema só aparece no boot se estiver dentro do initramfs, e o hook do
 	# kernel só refaz o initramfs quando um kernel é instalado/atualizado.
-	# Por isso refaz o de cada kernel em /boot (1 no mkiso/instalador, N no
-	# sistema instalado), pela versão de cada um — nunca pelo uname -r.
+	# Por isso confere o de cada kernel em /boot (1 no mkiso/instalador, N no
+	# sistema instalado) e só refaz o que não tem o tema atual — pela versão
+	# de cada um, nunca pelo uname -r.
 
 	if ! command -v dracut >/dev/null 2>&1; then
 		log "dracut não encontrado, pulando initramfs"
@@ -111,12 +113,40 @@ post_install() {
 		dracut_opts="--force --hostonly"
 	fi
 
+	# Versão anterior: refazia todos os initramfs sem conferir o tema.
+	# initramfs_changed=0
+	# for initramfs in /boot/initramfs-*.img; do
+	# 	[ -f "$initramfs" ] || continue
+	# 	kver="${initramfs#/boot/initramfs-}"
+	# 	kver="${kver%.img}"
+	# 	[ -d "/usr/lib/modules/$kver" ] || continue
+	#
+	# 	log "Recriando $initramfs"
+	# 	if dracut $dracut_opts "$initramfs" "$kver"; then
+	# 		initramfs_changed=1
+	# 	else
+	# 		log "dracut falhou para $kver — initramfs não atualizado"
+	# 	fi
+	# done
+
 	initramfs_changed=0
 	for initramfs in /boot/initramfs-*.img; do
 		[ -f "$initramfs" ] || continue
 		kver="${initramfs#/boot/initramfs-}"
 		kver="${kver%.img}"
 		[ -d "/usr/lib/modules/$kver" ] || continue
+
+		# Já atualizado = todo arquivo do tema instalado existe dentro do
+		# initramfs com o mesmo conteúdo (lsinitrd -f mostra o conteúdo).
+		# Arquivo faltando ou diferente (tema novo, upgrade que mudou só uma
+		# imagem, initramfs sem o plymouth) faz o cmp falhar e o initramfs
+		# é refeito.
+		if find "$themeDir" -type f | while IFS= read -r f; do
+			lsinitrd -f "${f#/}" "$initramfs" 2>/dev/null | cmp -s - "$f" || exit 1
+		done; then
+			log "$initramfs já contém o tema $defaultPlymouthTheme atualizado"
+			continue
+		fi
 
 		log "Recriando $initramfs"
 		if dracut $dracut_opts "$initramfs" "$kver"; then
